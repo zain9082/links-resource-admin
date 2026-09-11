@@ -1,0 +1,425 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Pricing {
+  FREE
+  FREEMIUM
+  PAID
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ResourceStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ContactInquiryStatus {
+  NEW
+  READ
+  ARCHIVED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+
+  accounts    Account[]
+  sessions    Session[]
+  favorites   Favorite[]
+  history     History[]
+  submissions Submission[]
+  logs        ActivityLog[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Category {
+  id          String @id @default(cuid())
+  slug        String @unique
+  name        String
+  description String
+  icon        String
+  gradient    String @default("purple")
+
+  resources Resource[]
+}
+
+model Tag {
+  id   String @id @default(cuid())
+  slug String @unique
+  name String
+
+  resources ResourceTag[]
+}
+
+model Resource {
+  id              String         @id @default(cuid())
+  slug            String         @unique
+  title           String
+  tagline         String
+  description     String         @db.Text
+  longDescription String?        @db.Text
+  url             String
+  pricing         Pricing        @default(FREEMIUM)
+  featured        Boolean        @default(false)
+  popular         Boolean        @default(false)
+  rating          Float          @default(0)
+  views           Int            @default(0)
+  logoColor       String         @default("purple")
+  logoUrl         String?
+  status          ResourceStatus @default(DRAFT)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  categoryId String
+  category   Category      @relation(fields: [categoryId], references: [id])
+  tags       ResourceTag[]
+  favorites  Favorite[]
+  history    History[]
+
+  @@index([categoryId])
+}
+
+model ResourceTag {
+  resourceId String
+  tagId      String
+
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([resourceId, tagId])
+}
+
+model Favorite {
+  id         String   @id @default(cuid())
+  userId     String
+  resourceId String
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, resourceId])
+}
+
+model History {
+  id         String   @id @default(cuid())
+  userId     String
+  resourceId String
+  viewedAt   DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Submission {
+  id          String           @id @default(cuid())
+  title       String
+  url         String
+  category    String
+  description String           @db.Text
+  status      SubmissionStatus @default(PENDING)
+  reason      String?
+  createdAt   DateTime         @default(now())
+  userId      String?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model HomepageContent {
+  id        String   @id @default(cuid())
+  section   String   @unique
+  data      Json
+  updatedAt DateTime @updatedAt
+  updatedBy String
+}
+
+model PageContent {
+  slug      String   @unique
+  data      Json
+  updatedAt DateTime @updatedAt
+  updatedBy String
+}
+
+model ServicePage {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  data      Json
+  updatedAt DateTime @updatedAt
+  updatedBy String
+}
+
+model TeamMember {
+  id           String   @id @default(cuid())
+  name         String
+  role         String
+  bio          String
+  email        String
+  imageUrl     String?
+  linkedIn     String?
+  twitter      String?
+  displayOrder Int      @default(0)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model CaseStudy {
+  id         String   @id @default(cuid())
+  clientName String
+  industry   String
+  title      String
+  challenge  String   @db.Text
+  solution   String   @db.Text
+  results    String   @db.Text
+  metrics    Json
+  tags       Json?
+  imageUrl   String?
+  published  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Testimonial {
+  id           String   @id @default(cuid())
+  authorName   String
+  company      String
+  role         String?
+  avatarUrl    String?
+  rating       Int      @default(5)
+  quote        String   @db.Text
+  featured     Boolean  @default(false)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
+model PricingPlan {
+  id           String   @id @default(cuid())
+  name         String
+  price        String
+  billingNote  String?
+  features     Json
+  isPopular    Boolean  @default(false)
+  ctaLabel     String
+  ctaHref      String
+  color        String   @default("purple")
+  displayOrder Int      @default(0)
+  updatedAt    DateTime @updatedAt
+}
+
+model Publication {
+  id        String   @id @default(cuid())
+  siteName  String
+  url       String
+  da        Int
+  dr        Int?
+  niche     String
+  type      String
+  tat       Int
+  price     Float
+  doFollow  Boolean  @default(true)
+  sponsored Boolean  @default(false)
+  traffic   String?
+  notes     String?
+  active    Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+model SeoSetting {
+  id               String   @id @default(cuid())
+  routePath        String   @unique
+  metaTitle        String?
+  metaDesc         String?
+  h1               String?
+  indexed          Boolean  @default(true)
+  robotsFollow     Boolean  @default(true)
+  canonical        String?
+  ogTitle          String?
+  ogDescription    String?
+  ogImage          String?
+  twitterCard      String   @default("summary_large_image")
+  schemaType       String?
+  customJsonLd     String?  @db.Text
+  sitemapInclude   Boolean  @default(true)
+  sitemapPriority  Float    @default(0.5)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Redirect {
+  id          String    @id @default(cuid())
+  source      String    @unique
+  destination String
+  /// 301 | 302 | 410
+  statusCode  Int       @default(301)
+  permanent   Boolean   @default(true)
+  isRegex     Boolean   @default(false)
+  active      Boolean   @default(true)
+  hitCount    Int       @default(0)
+  lastHitAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model GlobalSeoSettings {
+  id                     String   @id @default("global")
+  siteUrl                String   @default("https://linksresource.com")
+  siteName               String   @default("Links Resource")
+  titleTemplate          String   @default("%page_title% | %site_name%")
+  defaultMetaDescription String?  @db.Text
+  defaultOgImage         String?
+  favicon                String?
+  appleTouchIcon         String?
+  defaultLocale          String   @default("en_GB")
+  gscVerification        String?
+  ga4Id                  String?
+  gtmId                  String?
+  robotsTxt              String?  @db.Text
+  organizationSchemaJson String?  @db.Text
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model NotFoundLog {
+  id        String   @id @default(cuid())
+  path      String   @unique
+  hitCount  Int      @default(1)
+  referrer  String?
+  firstSeen DateTime @default(now())
+  lastSeen  DateTime @default(now())
+  resolved  Boolean  @default(false)
+
+  @@index([hitCount])
+  @@index([resolved, hitCount])
+}
+
+model EntityFaq {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  question   String
+  answer     String   @db.Text
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([entityType, entityId, sortOrder])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  action    String
+  entity    String
+  entityId  String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  admin User @relation(fields: [adminId], references: [id])
+
+  @@index([adminId, createdAt])
+}
+
+model ContactInquiry {
+  id        String               @id @default(cuid())
+  name      String
+  email     String
+  subject   String
+  phone     String?
+  website   String?
+  message   String               @db.Text
+  status    ContactInquiryStatus @default(NEW)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email])
+}
+
+enum ContactPaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model ContactPayment {
+  id              String               @id @default(cuid())
+  stripeSessionId String               @unique
+  stripePaymentId String?
+  status          ContactPaymentStatus @default(PENDING)
+  customerName    String
+  customerEmail   String
+  phone           String?
+  website         String?
+  service         String
+  message         String?              @db.Text
+  packageId       String
+  packageName     String
+  amount          Int
+  currency        String
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([customerEmail])
+  @@index([status, createdAt])
+}
